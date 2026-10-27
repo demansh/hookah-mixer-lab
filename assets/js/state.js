@@ -6,7 +6,7 @@ const LIST_SEPARATOR = ',';
 const MIX_SCREEN = 'mix';
 
 export function createStartState(temperature = DEFAULT_TEMPERATURE) {
-  return { screen: 'start', conceptId: null, required: [], excluded: [], page: 0, temperature };
+  return { screen: 'start', conceptId: null, required: [], excluded: [], locked: [], page: 0, temperature };
 }
 
 export function readState(search, catalog) {
@@ -19,8 +19,17 @@ export function readState(search, catalog) {
   const isKnownIngredient = (id) => isIngredient(catalog.flavorsById.get(id) ?? {});
   const required = unique(readList(params, 'keep').filter(isKnownIngredient)).slice(0, MAX_REQUIRED_FLAVORS);
   const excluded = unique(readList(params, 'drop').filter((id) => isKnownIngredient(id) && !required.includes(id)));
+  const locked = unique(readList(params, 'lock').filter((id) => isKnownIngredient(id) && !excluded.includes(id)));
   const page = Math.max(0, Number.parseInt(params.get('p') ?? '0', 10) || 0);
-  return { screen: MIX_SCREEN, conceptId, required, excluded, page, temperature };
+  return {
+    screen: MIX_SCREEN,
+    conceptId,
+    required,
+    excluded,
+    locked: lockedRequired(required, locked).length <= MAX_REQUIRED_FLAVORS ? locked : [],
+    page,
+    temperature,
+  };
 }
 
 export function writeState(state) {
@@ -32,6 +41,7 @@ export function writeState(state) {
     }
     writeList(params, 'keep', state.required);
     writeList(params, 'drop', state.excluded);
+    writeList(params, 'lock', state.locked);
     if (state.page > 0) {
       params.set('p', String(state.page));
     }
@@ -46,8 +56,28 @@ export function writeState(state) {
 export function toSelection(state) {
   return {
     concepts: state.conceptId ? { [state.conceptId]: 1 } : {},
-    required: state.required,
+    required: lockedRequired(state.required, state.locked),
     excluded: state.excluded,
+  };
+}
+
+export function hasLock(state) {
+  return state.locked.length > 0;
+}
+
+export function withoutLock(state) {
+  return hasLock(state) ? { ...state, locked: [] } : state;
+}
+
+export function removeFromMix(state, flavorId, mixFlavorIds) {
+  const required = without(state.required, flavorId);
+  const locked = without(mixFlavorIds, flavorId);
+  return {
+    ...state,
+    required,
+    excluded: state.excluded.includes(flavorId) ? state.excluded : [...state.excluded, flavorId],
+    locked: lockedRequired(required, locked).length <= MAX_REQUIRED_FLAVORS ? locked : [],
+    page: 0,
   };
 }
 
@@ -56,7 +86,7 @@ export function isMixScreen(state) {
 }
 
 export function startMix(state, conceptId) {
-  return { ...state, screen: MIX_SCREEN, conceptId, required: [], excluded: [], page: 0 };
+  return { ...state, screen: MIX_SCREEN, conceptId, required: [], excluded: [], locked: [], page: 0 };
 }
 
 export function canPin(state) {
@@ -74,19 +104,12 @@ export function unpinFlavor(state, flavorId) {
   return refine(state, { required: without(state.required, flavorId) });
 }
 
-export function excludeFlavor(state, flavorId) {
-  if (state.excluded.includes(flavorId)) {
-    return state;
-  }
-  return refine(state, { required: without(state.required, flavorId), excluded: [...state.excluded, flavorId] });
-}
-
 export function includeFlavor(state, flavorId) {
-  return refine(state, { excluded: without(state.excluded, flavorId) });
+  return refine(state, { excluded: without(state.excluded, flavorId), locked: [] });
 }
 
 export function nextPage(state) {
-  return { ...state, page: state.page + 1 };
+  return { ...state, locked: [], page: hasLock(state) ? 0 : state.page + 1 };
 }
 
 export function withPage(state, page) {
@@ -94,11 +117,15 @@ export function withPage(state, page) {
 }
 
 export function setTemperature(state, temperature) {
-  return state.temperature === temperature ? state : { ...state, temperature };
+  return state.temperature === temperature ? state : { ...state, temperature, locked: [] };
 }
 
 function refine(state, changes) {
   return { ...state, ...changes, page: 0 };
+}
+
+function lockedRequired(required, locked) {
+  return unique([...required, ...locked]);
 }
 
 function readList(params, key) {

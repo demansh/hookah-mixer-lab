@@ -1,7 +1,7 @@
 import { CORE_VERSION, loadCatalog, recommendSelection, createSessionSeed } from '../core/js/index.js';
 import {
   createStartState, readState, writeState, toSelection, isMixScreen, startMix, canPin, pinFlavor, unpinFlavor,
-  excludeFlavor, includeFlavor, nextPage, withPage, setTemperature,
+  removeFromMix, includeFlavor, nextPage, withPage, setTemperature, hasLock, withoutLock,
 } from './state.js';
 import { renderStart, renderMix, renderThermometer, renderBottomActions } from './render.js';
 import { TEMPERATURES } from './options.js';
@@ -10,6 +10,7 @@ import { resolveMood, showMaster } from './master.js';
 const baseUrl = document.documentElement.dataset.baseurl || '';
 const tierOrder = TEMPERATURES.map((temperature) => temperature.tier);
 const MAX_UNSEEN_ATTEMPTS = 12;
+const MAX_LOCK_PAGES = 5;
 
 const screenElement = document.getElementById('screen');
 const thermometerElement = document.getElementById('thermometer');
@@ -32,7 +33,7 @@ const actions = {
   onSurprise: () => update(startMix(state, null), { resetSeen: true }),
   onPin: (flavorId) => holdMix(pinFlavor(state, flavorId)),
   onUnpin: (flavorId) => holdMix(unpinFlavor(state, flavorId)),
-  onExclude: (flavorId) => update(excludeFlavor(state, flavorId), { resetSeen: true }),
+  onExclude: (flavorId) => removeFlavor(flavorId),
   onInclude: (flavorId) => update(includeFlavor(state, flavorId), { resetSeen: true }),
   onAnother: () => showAnotherMix(),
   onReset: () => resetProgress(),
@@ -64,6 +65,12 @@ function resetProgress() {
   shuffledConcepts = shuffle(catalog.concepts);
   renderFooter();
   update(createStartState(state.temperature), { resetSeen: true });
+}
+
+function removeFlavor(flavorId) {
+  const shownMix = heldMix ?? currentMix;
+  const mixFlavorIds = shownMix ? shownMix.components.map((component) => component.flavorId) : [];
+  update(removeFromMix(state, flavorId, mixFlavorIds), { resetSeen: true });
 }
 
 function holdMix(nextState) {
@@ -131,9 +138,17 @@ async function render({ preferUnseen = false } = {}) {
     return;
   }
   try {
-    const { mix, page, wrapped } = preferUnseen ? await loadUnseenMix(state.page) : await loadMix(state.page);
+    let { mix, page, wrapped } = await loadForState(preferUnseen);
+    const isLockFailed = !mix && hasLock(state);
+    if (isLockFailed) {
+      ({ mix, page, wrapped } = await loadMix(state.page, withoutLock(state)));
+    }
     if (revision !== renderRevision) {
       return;
+    }
+    if (isLockFailed) {
+      state = withoutLock(state);
+      saveUrl(true);
     }
     if (wrapped) {
       seenMixKeys.clear();
@@ -167,14 +182,39 @@ function renderMixCard(mix) {
   }, actions);
 }
 
-async function loadMix(page) {
-  const request = { ...toSelection(state), seed: sessionSeed };
+async function loadMix(page, fromState = state) {
+  const request = { ...toSelection(fromState), seed: sessionSeed };
   const result = await recommendSelection(request, catalog, page);
   if (page > 0 && result.mixes.length === 0) {
     const firstPage = await recommendSelection(request, catalog, 0);
-    return { mix: pickMix(firstPage.mixes, state.temperature), page: 0, wrapped: true };
+    return { mix: pickMix(firstPage.mixes, fromState.temperature), page: 0, wrapped: true };
   }
-  return { mix: pickMix(result.mixes, state.temperature), page, wrapped: false };
+  return { mix: pickMix(result.mixes, fromState.temperature), page, wrapped: false };
+}
+
+function loadForState(preferUnseen) {
+  if (hasLock(state)) {
+    return loadLockedMix(state);
+  }
+  return preferUnseen ? loadUnseenMix(state.page) : loadMix(state.page);
+}
+
+async function loadLockedMix(fromState) {
+  const request = { ...toSelection(fromState), seed: sessionSeed };
+  const maxSize = fromState.locked.length + 1;
+  let fallbackMix = null;
+  for (let page = 0; page < MAX_LOCK_PAGES; page += 1) {
+    const { mixes } = await recommendSelection(request, catalog, page);
+    const mix = pickMix(mixes, fromState.temperature);
+    if (!mix) {
+      break;
+    }
+    fallbackMix = fallbackMix ?? mix;
+    if (mix.components.length <= maxSize) {
+      return { mix, page: fromState.page, wrapped: false };
+    }
+  }
+  return { mix: fallbackMix, page: fromState.page, wrapped: false };
 }
 
 async function loadUnseenMix(startPage) {
