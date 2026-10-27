@@ -25,16 +25,15 @@ let state = createStartState();
 let renderRevision = 0;
 let currentMix = null;
 let heldMix = null;
-let repeatCount = 0;
 const seenMixKeys = new Set();
 
 const actions = {
-  onPickConcept: (conceptId) => update(startMix(state, conceptId), { resetRepeats: true }),
-  onSurprise: () => update(startMix(state, null), { resetRepeats: true }),
+  onPickConcept: (conceptId) => update(startMix(state, conceptId), { resetSeen: true }),
+  onSurprise: () => update(startMix(state, null), { resetSeen: true }),
   onPin: (flavorId) => holdMix(pinFlavor(state, flavorId)),
   onUnpin: (flavorId) => holdMix(unpinFlavor(state, flavorId)),
-  onExclude: (flavorId) => update(excludeFlavor(state, flavorId), { resetRepeats: true }),
-  onInclude: (flavorId) => update(includeFlavor(state, flavorId), { resetRepeats: true }),
+  onExclude: (flavorId) => update(excludeFlavor(state, flavorId), { resetSeen: true }),
+  onInclude: (flavorId) => update(includeFlavor(state, flavorId), { resetSeen: true }),
   onAnother: () => showAnotherMix(),
   onReset: () => resetProgress(),
   onSetTemperature: (tier) => update(setTemperature(state, tier), { replace: true, keepScroll: true }),
@@ -54,7 +53,6 @@ async function main() {
   window.addEventListener('popstate', () => {
     state = readState(window.location.search, catalog);
     heldMix = null;
-    repeatCount = 0;
     seenMixKeys.clear();
     render();
   });
@@ -65,7 +63,7 @@ function resetProgress() {
   sessionSeed = createSessionSeed();
   shuffledConcepts = shuffle(catalog.concepts);
   renderFooter();
-  update(createStartState(state.temperature), { resetRepeats: true });
+  update(createStartState(state.temperature), { resetSeen: true });
 }
 
 function holdMix(nextState) {
@@ -73,7 +71,6 @@ function holdMix(nextState) {
     return;
   }
   heldMix = heldMix ?? currentMix;
-  repeatCount = 0;
   state = nextState;
   saveUrl(false);
   render();
@@ -85,7 +82,6 @@ function showAnotherMix() {
     render({ preferUnseen: true });
     return;
   }
-  repeatCount += 1;
   update(nextPage(state), { preferUnseen: true });
 }
 
@@ -93,13 +89,12 @@ function renderFooter() {
   footerElement.textContent = `core ${CORE_VERSION} · seed ${sessionSeed}`;
 }
 
-function update(nextState, { replace = false, keepScroll = false, resetRepeats = false, preferUnseen = false } = {}) {
+function update(nextState, { replace = false, keepScroll = false, resetSeen = false, preferUnseen = false } = {}) {
   if (nextState === state) {
     return;
   }
   heldMix = null;
-  if (resetRepeats) {
-    repeatCount = 0;
+  if (resetSeen) {
     seenMixKeys.clear();
   }
   state = nextState;
@@ -126,12 +121,12 @@ async function render({ preferUnseen = false } = {}) {
   if (!isMixScreen(state)) {
     currentMix = null;
     showStatus(null);
-    showMaster(masterElement, resolveMood({ isStart: true }));
+    showMaster(masterElement, resolveMood({ temperature: state.temperature }));
     renderStart(screenElement, { concepts: shuffledConcepts }, actions);
     return;
   }
   if (heldMix) {
-    showMaster(masterElement, resolveMood({ hasMix: true, repeatCount, temperature: state.temperature }));
+    showMaster(masterElement, resolveMood({ temperature: state.temperature }));
     renderMixCard(heldMix);
     return;
   }
@@ -152,7 +147,7 @@ async function render({ preferUnseen = false } = {}) {
     }
     currentMix = mix;
     showStatus(null);
-    const mood = resolveMood({ hasMix: Boolean(mix), wrapped, repeatCount, temperature: state.temperature });
+    const mood = resolveMood({ hasMix: Boolean(mix), wrapped, temperature: state.temperature });
     showMaster(masterElement, mood);
     renderMixCard(mix);
   } catch (error) {
