@@ -1,9 +1,7 @@
-export const LANG = 'ru';
-
 export const TEMPERATURES = [
-  { tier: 'classic', label: '36,6°', face: '😌', mood: 'Мастер спокоен' },
-  { tier: 'balanced', label: '37,2°', face: '🤒', mood: 'Мастер экспериментирует' },
-  { tier: 'bold', label: '38°', face: '🥴', mood: 'Мастер бредит' },
+  { tier: 'classic', labelKey: 'temperatureClassic', face: '😌', moodKey: 'moodClassic' },
+  { tier: 'balanced', labelKey: 'temperatureBalanced', face: '🤒', moodKey: 'moodBalanced' },
+  { tier: 'bold', labelKey: 'temperatureBold', face: '🥴', moodKey: 'moodBold' },
 ];
 
 export const DEFAULT_TEMPERATURE = 'classic';

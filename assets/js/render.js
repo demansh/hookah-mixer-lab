@@ -1,10 +1,11 @@
 import { flavorLabel } from '../core/js/index.js';
-import { TEMPERATURES, LANG } from './options.js';
+import { TEMPERATURES } from './options.js';
+import { t, getLang } from './i18n.js';
 import { createIcon } from './icons.js';
 import { CONCEPT_EMOJI } from './concept-emoji.js';
 
 export function conceptLabel(concept) {
-  const phrase = concept.phrases[LANG][0] ?? concept.id;
+  const phrase = concept.phrases[getLang()][0] ?? concept.phrases.ru[0] ?? concept.id;
   return phrase.charAt(0).toUpperCase() + phrase.slice(1);
 }
 
@@ -12,7 +13,7 @@ export function renderStart(container, { concepts }, { onPickConcept }) {
   const grid = createElement('div', 'concept-grid');
   concepts.forEach((concept) => grid.append(createConceptButton(concept, () => onPickConcept(concept.id))));
   container.replaceChildren(
-    createElement('p', 'screen-hint', 'Выберите настроение — или доверьтесь случаю кнопкой внизу.'),
+    createElement('p', 'screen-hint', t('startHint')),
     grid,
   );
 }
@@ -31,44 +32,44 @@ function createConceptButton(concept, onClick) {
 export function renderMix(container, view, actions) {
   const { concept, mix, isFallbackTier } = view;
   const card = createElement('article', `mix-card mix-card--${mix?.tier ?? 'none'}`);
-  card.append(createElement('h2', 'mix-concept', concept ? conceptLabel(concept) : 'На вкус мастера'));
+  card.append(createElement('h2', 'mix-concept', concept ? conceptLabel(concept) : t('mastersChoice')));
   if (isFallbackTier) {
-    card.append(createElement('p', 'mix-hint', 'На этой температуре вариантов нет — показан ближайший.'));
+    card.append(createElement('p', 'mix-hint', t('fallbackTier')));
   }
   if (mix) {
     const componentList = createElement('ul', 'mix-components');
     mix.components.forEach((component) => componentList.append(createComponentRow(component, view, actions)));
     card.append(componentList);
-    const noteText = mix.note?.[LANG];
+    const noteText = mix.note?.[getLang()];
     if (noteText) {
       card.append(createElement('p', 'mix-note', noteText));
     }
   } else {
-    card.append(createElement('p', 'mix-hint', 'Ничего не нашлось. Верните убранный аромат или открепите один.'));
+    card.append(createElement('p', 'mix-hint', t('nothingFound')));
   }
   container.replaceChildren(card, ...optional(createExcludedRow(view, actions)));
 }
 
 export function renderBottomActions(container, isMixScreen, { onSurprise, onReset, onAnother }) {
   if (!isMixScreen) {
-    container.replaceChildren(createButton('surprise-button', onSurprise, '🎲 Случайный микс'));
+    container.replaceChildren(createButton('surprise-button', onSurprise, t('randomMix')));
     return;
   }
   container.replaceChildren(
-    createIconButton('reset-button', onReset, 'trash', 'Начать заново'),
-    createIconButton('another-button', onAnother, 'refresh', 'Другой микс'),
+    createIconButton('reset-button', onReset, 'trash', t('startOver')),
+    createIconButton('another-button', onAnother, 'refresh', t('anotherMix')),
   );
 }
 
 export function renderThermometer(container, currentTier, { onSetTemperature }) {
   const scale = createElement('div', `thermometer-scale thermometer-scale--${currentTier}`);
   scale.setAttribute('role', 'group');
-  scale.setAttribute('aria-label', 'Температура мастера');
+  scale.setAttribute('aria-label', t('thermometer'));
   TEMPERATURES.forEach((temperature) => {
     const selectTemperature = () => onSetTemperature(temperature.tier);
     const button = createButton(`thermometer-step thermometer-step--${temperature.tier}`, selectTemperature);
     button.setAttribute('aria-pressed', String(temperature.tier === currentTier));
-    button.append(createElement('span', 'thermometer-value', temperature.label));
+    button.append(createElement('span', 'thermometer-value', t(temperature.labelKey)));
     scale.append(button);
   });
   const tube = createElement('div', 'thermometer-tube');
@@ -90,7 +91,7 @@ function createComponentRow({ flavorId, share }, { state, catalog, canPin }, { o
     'pin-button',
     () => (isPinned ? onUnpin(flavorId) : onPin(flavorId)),
     'heart',
-    isPinned ? `Открепить: ${flavorName}` : `Оставить во всех миксах: ${flavorName}`,
+    t(isPinned ? 'unpin' : 'pin', { flavor: flavorName }),
   );
   pinButton.setAttribute('aria-pressed', String(isPinned));
   pinButton.disabled = !isPinned && !canPin;
@@ -98,7 +99,7 @@ function createComponentRow({ flavorId, share }, { state, catalog, canPin }, { o
     pinButton,
     createElement('span', 'mix-component-name', flavorName),
     createElement('span', 'mix-component-share', `${share}%`),
-    createIconButton('exclude-button', () => onExclude(flavorId), 'x', `Убрать: ${flavorName}`),
+    createIconButton('exclude-button', () => onExclude(flavorId), 'x', t('remove', { flavor: flavorName })),
   );
   return item;
 }
@@ -108,7 +109,7 @@ function createExcludedRow({ state, catalog }, { onInclude }) {
     return null;
   }
   const row = createElement('div', 'excluded-row');
-  row.append(createElement('span', 'excluded-title', 'Убрано:'));
+  row.append(createElement('span', 'excluded-title', t('removed')));
   state.excluded.forEach((id) => {
     row.append(createButton('excluded-chip', () => onInclude(id), `${label(catalog, id)} ✕`));
   });
@@ -141,7 +142,7 @@ function createElement(tagName, className, text) {
 
 function label(catalog, flavorId) {
   const flavor = catalog.flavorsById.get(flavorId);
-  return flavor ? flavorLabel(flavor, LANG) : flavorId;
+  return flavor ? flavorLabel(flavor, getLang()) : flavorId;
 }
 
 function optional(element) {

@@ -1,8 +1,9 @@
 import { TEMPERATURES } from './options.js';
+import { t } from './i18n.js';
 
 const EVENT_MOODS = {
-  puzzled: { face: '🤨', label: 'Мастер недоумевает: так не сочетается' },
-  dizzy: { face: '😵', label: 'Идеи кончились, мастер начинает сначала' },
+  puzzled: { face: '🤨', labelKey: 'moodPuzzled' },
+  dizzy: { face: '😵', labelKey: 'moodDizzy' },
 };
 
 export function resolveMood({ hasMix = true, wrapped = false, temperature }) {
@@ -12,11 +13,12 @@ export function resolveMood({ hasMix = true, wrapped = false, temperature }) {
   if (wrapped) {
     return EVENT_MOODS.dizzy;
   }
-  const { face, mood } = TEMPERATURES.find((item) => item.tier === temperature);
-  return { face, label: mood };
+  const { face, moodKey } = TEMPERATURES.find((item) => item.tier === temperature);
+  return { face, labelKey: moodKey };
 }
 
-export function showMaster(element, { face, label }) {
+export function showMaster(element, { face, labelKey }) {
+  const label = t(labelKey);
   element.textContent = face;
   element.setAttribute('aria-label', label);
   element.title = label;

@@ -6,6 +6,7 @@ import {
 import { renderStart, renderMix, renderThermometer, renderBottomActions } from './render.js';
 import { TEMPERATURES } from './options.js';
 import { resolveMood, showMaster } from './master.js';
+import { initLang, toggleLang, t } from './i18n.js';
 
 const baseUrl = document.documentElement.dataset.baseurl || '';
 const tierOrder = TEMPERATURES.map((temperature) => temperature.tier);
@@ -16,6 +17,7 @@ const screenElement = document.getElementById('screen');
 const thermometerElement = document.getElementById('thermometer');
 const bottomActionsElement = document.getElementById('bottom-actions');
 const masterElement = document.getElementById('master');
+const langToggleElement = document.getElementById('lang-toggle');
 const statusElement = document.getElementById('status');
 const footerElement = document.getElementById('app-footer');
 
@@ -41,12 +43,21 @@ const actions = {
 };
 
 async function main() {
+  initLang();
+  renderLangToggle();
+  langToggleElement.addEventListener('click', () => {
+    toggleLang();
+    renderLangToggle();
+    if (catalog) {
+      render();
+    }
+  });
   renderFooter();
   try {
     catalog = await loadCatalog(`${baseUrl}/assets/core/data`);
   } catch (error) {
     console.error(error);
-    showStatus('Не удалось загрузить базу ароматов. Обновите страницу.');
+    showStatus(t('loadError'));
     return;
   }
   shuffledConcepts = shuffle(catalog.concepts);
@@ -90,6 +101,12 @@ function showAnotherMix() {
     return;
   }
   update(nextPage(state), { preferUnseen: true });
+}
+
+function renderLangToggle() {
+  langToggleElement.textContent = t('langSwitch');
+  langToggleElement.setAttribute('aria-label', t('langSwitchLabel'));
+  langToggleElement.title = t('langSwitchLabel');
 }
 
 function renderFooter() {
@@ -167,7 +184,7 @@ async function render({ preferUnseen = false } = {}) {
     renderMixCard(mix);
   } catch (error) {
     console.error(error);
-    showStatus('Не получилось подобрать микс. Вернитесь назад и попробуйте другое настроение.');
+    showStatus(t('engineError'));
   }
 }
 
