@@ -3,16 +3,7 @@ layout: default
 ---
 <main class="app">
   <h1 class="app-title">Hookah Mixer <span class="app-badge">lab</span></h1>
-
-  <form class="query-form" id="query-form" novalidate>
-    <input class="query-input" id="query-input" name="query" type="text" maxlength="200"
-           autocomplete="off" enterkeyhint="search" aria-label="Запрос"
-           placeholder="Например: свежие тропические фрукты с холодком">
-    <button class="query-submit" id="query-submit" type="submit" disabled>Подобрать</button>
-  </form>
-
   <p class="status" id="status" role="status" hidden></p>
-  <section class="mixes" id="mixes" aria-live="polite"></section>
-
+  <div class="screen" id="screen"></div>
   <footer class="app-footer" id="app-footer"></footer>
 </main>

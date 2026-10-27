@@ -1,26 +1,23 @@
-import { CORE_VERSION, loadCatalog, recommend, createSessionSeed, flavorLabel } from '../core/js/index.js';
-
-const LANG = 'ru';
-const TIER_LABELS = {
-  classic: 'Классика с изюминкой',
-  balanced: 'Эксперимент',
-  bold: 'Смелое сочетание',
-};
+import { CORE_VERSION, loadCatalog, recommend, createSessionSeed } from '../core/js/index.js';
+import {
+  readState, writeState, buildQuery, findDirection, canPin, isCoolingOn, selectDirection, pinFlavor, unpinFlavor,
+  excludeFlavor, includeFlavor, toggleShift, toggleCooling, nextPage, withPage, createEmptyState,
+} from './state.js';
+import { renderDirections, renderResults } from './render.js';
 
 const baseUrl = document.documentElement.dataset.baseurl || '';
 const sessionSeed = createSessionSeed();
 
-const formElement = document.getElementById('query-form');
-const queryInput = document.getElementById('query-input');
-const submitButton = document.getElementById('query-submit');
+const screenElement = document.getElementById('screen');
 const statusElement = document.getElementById('status');
-const mixesContainer = document.getElementById('mixes');
 const footerElement = document.getElementById('app-footer');
+
+let catalog = null;
+let state = createEmptyState();
+let renderRevision = 0;
 
 async function main() {
   footerElement.textContent = `core ${CORE_VERSION} · seed ${sessionSeed}`;
-
-  let catalog;
   try {
     catalog = await loadCatalog(`${baseUrl}/assets/core/data`);
   } catch (error) {
@@ -28,70 +25,80 @@ async function main() {
     showStatus('Не удалось загрузить базу ароматов. Обновите страницу.');
     return;
   }
-  submitButton.disabled = false;
-
-  const session = { query: null, page: 0 };
-
-  formElement.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const query = queryInput.value.trim();
-    const page = query === session.query ? session.page + 1 : 0;
-    try {
-      const { mixes, loadedPage } = await loadMixes(query, page, catalog);
-      Object.assign(session, { query, page: loadedPage });
-      showStatus(null);
-      renderMixes(mixes, catalog);
-    } catch (error) {
-      console.error(error);
-      showStatus('Не получилось подобрать миксы. Попробуйте другой запрос.');
-    }
+  state = readState(window.location.search, catalog);
+  window.addEventListener('popstate', () => {
+    state = readState(window.location.search, catalog);
+    render();
   });
+  render();
 }
 
-async function loadMixes(query, page, catalog) {
+const actions = {
+  onSelect: (directionId) => update(selectDirection(directionId)),
+  onBack: () => update(createEmptyState()),
+  onPin: (flavorId) => update(pinFlavor(state, flavorId)),
+  onUnpin: (flavorId) => update(unpinFlavor(state, flavorId)),
+  onExclude: (flavorId) => update(excludeFlavor(state, flavorId)),
+  onInclude: (flavorId) => update(includeFlavor(state, flavorId)),
+  onToggleShift: (shiftId) => update(toggleShift(state, shiftId)),
+  onToggleCooling: () => update(toggleCooling(state)),
+  onMore: () => update(nextPage(state), { replace: true }),
+};
+
+function update(nextState, { replace = false } = {}) {
+  if (nextState === state) {
+    return;
+  }
+  state = nextState;
+  saveUrl(replace);
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function saveUrl(replace) {
+  const url = `${window.location.pathname}${writeState(state)}`;
+  if (replace) {
+    window.history.replaceState(null, '', url);
+  } else {
+    window.history.pushState(null, '', url);
+  }
+}
+
+async function render() {
+  const revision = ++renderRevision;
+  const direction = findDirection(state.directionId);
+  if (!direction) {
+    showStatus(null);
+    renderDirections(screenElement, actions);
+    return;
+  }
+  try {
+    const { mixes, page } = await loadMixes(buildQuery(state, catalog), state.page);
+    if (revision !== renderRevision) {
+      return;
+    }
+    if (page !== state.page) {
+      state = withPage(state, page);
+      saveUrl(true);
+    }
+    showStatus(null);
+    renderResults(screenElement, {
+      direction, state, catalog, mixes, canPin: canPin(state), isCoolingOn: isCoolingOn(state),
+    }, actions);
+  } catch (error) {
+    console.error(error);
+    showStatus('Не получилось подобрать миксы. Снимите одно из уточнений или выберите другое направление.');
+  }
+}
+
+async function loadMixes(query, page) {
   const request = { query, seed: sessionSeed };
   const result = await recommend(request, catalog, page);
   if (page > 0 && result.mixes.length === 0) {
     const firstPage = await recommend(request, catalog, 0);
-    return { mixes: firstPage.mixes, loadedPage: 0 };
+    return { mixes: firstPage.mixes, page: 0 };
   }
-  return { mixes: result.mixes, loadedPage: page };
-}
-
-function renderMixes(mixes, catalog) {
-  mixesContainer.replaceChildren(...mixes.map((mix) => createMixCard(mix, catalog)));
-}
-
-function createMixCard(mix, catalog) {
-  const card = createElement('article', `mix-card mix-card--${mix.tier}`);
-  card.append(createElement('h2', 'mix-tier', TIER_LABELS[mix.tier] ?? mix.tier));
-
-  const componentList = createElement('ul', 'mix-components');
-  mix.components.forEach(({ flavorId, share }) => {
-    const item = createElement('li', 'mix-component');
-    const flavor = catalog.flavorsById.get(flavorId);
-    item.append(
-      createElement('span', 'mix-component-name', flavor ? flavorLabel(flavor, LANG) : flavorId),
-      createElement('span', 'mix-component-share', `${share}%`),
-    );
-    componentList.append(item);
-  });
-  card.append(componentList);
-
-  const noteText = mix.note?.[LANG];
-  if (noteText) {
-    card.append(createElement('p', 'mix-note', noteText));
-  }
-  return card;
-}
-
-function createElement(tagName, className, text) {
-  const element = document.createElement(tagName);
-  element.className = className;
-  if (text !== undefined) {
-    element.textContent = text;
-  }
-  return element;
+  return { mixes: result.mixes, page };
 }
 
 function showStatus(message) {
