@@ -1,0 +1,13 @@
+title: Hookah Mixer Lab
+description: Экспериментальный интерфейс Hookah Mixer
+url: https://demansh.github.io
+baseurl: /hookah-mixer-lab
+lang: ru
+
+exclude:
+  - README.md
+  - CLAUDE.md
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+  - tools
