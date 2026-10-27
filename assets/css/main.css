@@ -18,7 +18,7 @@
   --space-3: 12px;
   --space-4: 16px;
   --control-height: 44px;
-  --bottom-bar-height: 150px;
+  --bottom-bar-height: 140px;
   --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-emoji: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
   color-scheme: dark;
@@ -133,13 +133,7 @@ button:focus-visible {
 }
 
 .mix-concept {
-  margin: 0;
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-}
-
-.mix-mood {
-  margin: var(--space-1) 0 var(--space-3);
+  margin: 0 0 var(--space-2);
   font-size: 1rem;
   color: var(--tier-color);
 }
@@ -253,10 +247,48 @@ button:focus-visible {
 }
 
 .bottom-actions,
-.thermometer {
+.thermometer-row {
   width: 100%;
   max-width: 528px;
   margin: 0 auto;
+}
+
+.thermometer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.master {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  font: 30px/1 var(--font-emoji);
+  user-select: none;
+}
+
+.master.is-changing {
+  animation: master-pop 280ms ease-out;
+}
+
+@keyframes master-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .master.is-changing {
+    animation: none;
+  }
 }
 
 .bottom-actions {
@@ -303,15 +335,8 @@ button:focus-visible {
 }
 
 .thermometer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.thermometer-title {
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-  text-align: center;
+  flex: 1;
+  min-width: 0;
 }
 
 .thermometer-scale {

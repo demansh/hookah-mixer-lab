@@ -19,12 +19,9 @@ export function renderStart(container, { concepts }, { onPickConcept }) {
 }
 
 export function renderMix(container, view, actions) {
-  const { concept, mix, temperature, isFallbackTier } = view;
+  const { concept, mix, isFallbackTier } = view;
   const card = createElement('article', `mix-card mix-card--${mix?.tier ?? 'none'}`);
-  card.append(
-    createElement('p', 'mix-concept', concept ? conceptLabel(concept) : 'На вкус мастера'),
-    createElement('h2', 'mix-mood', temperature.mood),
-  );
+  card.append(createElement('h2', 'mix-concept', concept ? conceptLabel(concept) : 'На вкус мастера'));
   if (isFallbackTier) {
     card.append(createElement('p', 'mix-hint', 'На этой температуре вариантов нет — показан ближайший.'));
   }
@@ -66,7 +63,7 @@ export function renderThermometer(container, currentTier, { onSetTemperature }) 
   tube.setAttribute('aria-hidden', 'true');
   tube.append(createElement('div', 'thermometer-empty'), createElement('div', 'thermometer-knob'));
   scale.append(tube);
-  container.replaceChildren(createElement('span', 'thermometer-title', '🌡️ Температура мастера'), scale);
+  container.replaceChildren(scale);
 }
 
 function createComponentRow({ flavorId, share }, { state, catalog, canPin }, { onPin, onUnpin, onExclude }) {
