@@ -1,103 +1,88 @@
-import { MAX_REQUIRED_FLAVORS, isIngredient, flavorLabel } from '../core/js/index.js';
-import { DIRECTIONS, SHIFTS, COOLING_ID, LANG } from './options.js';
+import { MAX_REQUIRED_FLAVORS, isIngredient } from '../core/js/index.js';
+import { TEMPERATURES, DEFAULT_TEMPERATURE } from './options.js';
 
-const directionsById = new Map(DIRECTIONS.map((direction) => [direction.id, direction]));
-const shiftsById = new Map(SHIFTS.map((shift) => [shift.id, shift]));
+const temperatureTiers = new Set(TEMPERATURES.map((temperature) => temperature.tier));
 const LIST_SEPARATOR = ',';
+const MIX_SCREEN = 'mix';
 
-export function createEmptyState() {
-  return { directionId: null, pinned: [], excluded: [], shifts: [], page: 0 };
-}
-
-export function findDirection(directionId) {
-  return directionsById.get(directionId) ?? null;
+export function createStartState(temperature = DEFAULT_TEMPERATURE) {
+  return { screen: 'start', conceptId: null, required: [], excluded: [], page: 0, temperature };
 }
 
 export function readState(search, catalog) {
   const params = new URLSearchParams(search);
-  const directionId = params.get('d');
-  if (!directionsById.has(directionId)) {
-    return createEmptyState();
+  const temperature = temperatureTiers.has(params.get('t')) ? params.get('t') : DEFAULT_TEMPERATURE;
+  if (params.get('s') !== MIX_SCREEN) {
+    return createStartState(temperature);
   }
+  const conceptId = catalog.concepts.some((concept) => concept.id === params.get('c')) ? params.get('c') : null;
   const isKnownIngredient = (id) => isIngredient(catalog.flavorsById.get(id) ?? {});
-  const pinned = unique(readList(params, 'keep').filter(isKnownIngredient)).slice(0, MAX_REQUIRED_FLAVORS);
-  const excluded = unique(readList(params, 'drop').filter((id) => isKnownIngredient(id) && !pinned.includes(id)));
-  const shifts = unique(readList(params, 'shift').filter((id) => shiftsById.has(id)));
+  const required = unique(readList(params, 'keep').filter(isKnownIngredient)).slice(0, MAX_REQUIRED_FLAVORS);
+  const excluded = unique(readList(params, 'drop').filter((id) => isKnownIngredient(id) && !required.includes(id)));
   const page = Math.max(0, Number.parseInt(params.get('p') ?? '0', 10) || 0);
-  return { directionId, pinned, excluded, shifts, page };
+  return { screen: MIX_SCREEN, conceptId, required, excluded, page, temperature };
 }
 
 export function writeState(state) {
-  if (!state.directionId) {
-    return '';
+  const params = new URLSearchParams();
+  if (state.screen === MIX_SCREEN) {
+    params.set('s', MIX_SCREEN);
+    if (state.conceptId) {
+      params.set('c', state.conceptId);
+    }
+    writeList(params, 'keep', state.required);
+    writeList(params, 'drop', state.excluded);
+    if (state.page > 0) {
+      params.set('p', String(state.page));
+    }
   }
-  const params = new URLSearchParams({ d: state.directionId });
-  writeList(params, 'keep', state.pinned);
-  writeList(params, 'drop', state.excluded);
-  writeList(params, 'shift', state.shifts);
-  if (state.page > 0) {
-    params.set('p', String(state.page));
+  if (state.temperature !== DEFAULT_TEMPERATURE) {
+    params.set('t', state.temperature);
   }
-  return `?${params.toString().replaceAll('%2C', LIST_SEPARATOR)}`;
+  const search = params.toString().replaceAll('%2C', LIST_SEPARATOR);
+  return search ? `?${search}` : '';
 }
 
-export function buildQuery(state, catalog) {
-  const label = (id) => flavorLabel(catalog.flavorsById.get(id), LANG);
-  return [
-    findDirection(state.directionId)?.query ?? '',
-    ...state.pinned.map(label),
-    ...state.shifts.map((id) => shiftsById.get(id).query),
-    ...state.excluded.map((id) => `без ${label(id)}`),
-  ].filter(Boolean).join(', ');
+export function toSelection(state) {
+  return {
+    concepts: state.conceptId ? { [state.conceptId]: 1 } : {},
+    required: state.required,
+    excluded: state.excluded,
+  };
+}
+
+export function isMixScreen(state) {
+  return state.screen === MIX_SCREEN;
+}
+
+export function startMix(state, conceptId) {
+  return { ...state, screen: MIX_SCREEN, conceptId, required: [], excluded: [], page: 0 };
 }
 
 export function canPin(state) {
-  return state.pinned.length < MAX_REQUIRED_FLAVORS;
-}
-
-export function selectDirection(directionId) {
-  return { ...createEmptyState(), directionId };
+  return state.required.length < MAX_REQUIRED_FLAVORS;
 }
 
 export function pinFlavor(state, flavorId) {
-  if (state.pinned.includes(flavorId) || !canPin(state)) {
+  if (state.required.includes(flavorId) || !canPin(state)) {
     return state;
   }
-  return refine(state, {
-    pinned: [...state.pinned, flavorId],
-    excluded: without(state.excluded, flavorId),
-  });
+  return refine(state, { required: [...state.required, flavorId], excluded: without(state.excluded, flavorId) });
 }
 
 export function unpinFlavor(state, flavorId) {
-  return refine(state, { pinned: without(state.pinned, flavorId) });
+  return refine(state, { required: without(state.required, flavorId) });
 }
 
 export function excludeFlavor(state, flavorId) {
   if (state.excluded.includes(flavorId)) {
     return state;
   }
-  return refine(state, {
-    pinned: without(state.pinned, flavorId),
-    excluded: [...state.excluded, flavorId],
-  });
+  return refine(state, { required: without(state.required, flavorId), excluded: [...state.excluded, flavorId] });
 }
 
 export function includeFlavor(state, flavorId) {
   return refine(state, { excluded: without(state.excluded, flavorId) });
-}
-
-export function toggleShift(state, shiftId) {
-  const shifts = state.shifts.includes(shiftId) ? without(state.shifts, shiftId) : [...state.shifts, shiftId];
-  return refine(state, { shifts });
-}
-
-export function isCoolingOn(state) {
-  return state.pinned.includes(COOLING_ID);
-}
-
-export function toggleCooling(state) {
-  return isCoolingOn(state) ? unpinFlavor(state, COOLING_ID) : pinFlavor(state, COOLING_ID);
 }
 
 export function nextPage(state) {
@@ -106,6 +91,10 @@ export function nextPage(state) {
 
 export function withPage(state, page) {
   return { ...state, page };
+}
+
+export function setTemperature(state, temperature) {
+  return state.temperature === temperature ? state : { ...state, temperature };
 }
 
 function refine(state, changes) {

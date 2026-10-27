@@ -1,96 +1,69 @@
 import { flavorLabel } from '../core/js/index.js';
-import { DIRECTIONS, SHIFTS, COOLING_ID, COOLING_LABEL, TIER_LABELS, LANG } from './options.js';
+import { TEMPERATURES, LANG } from './options.js';
 
-export function renderDirections(container, { onSelect }) {
-  const grid = createElement('div', 'direction-grid');
-  DIRECTIONS.forEach((direction) => {
-    const button = createButton(`direction-button direction-button--${direction.id}`, () => onSelect(direction.id));
+export function conceptLabel(concept) {
+  const phrase = concept.phrases[LANG][0] ?? concept.id;
+  return phrase.charAt(0).toUpperCase() + phrase.slice(1);
+}
+
+export function renderStart(container, { concepts }, { onPickConcept, onSurprise }) {
+  const cloud = createElement('div', 'concept-cloud');
+  concepts.forEach((concept) => {
+    cloud.append(createButton('concept-chip', () => onPickConcept(concept.id), conceptLabel(concept)));
+  });
+  container.replaceChildren(
+    createButton('surprise-button', onSurprise, '🎲 Мастер, на твой вкус'),
+    createElement('p', 'screen-hint', 'или выберите настроение:'),
+    cloud,
+  );
+}
+
+export function renderMix(container, view, actions) {
+  const { concept, mix, temperature, isFallbackTier } = view;
+  const card = createElement('article', `mix-card mix-card--${mix?.tier ?? 'none'}`);
+  card.append(
+    createElement('p', 'mix-concept', concept ? conceptLabel(concept) : 'На вкус мастера'),
+    createElement('h2', 'mix-mood', temperature.mood),
+  );
+  if (isFallbackTier) {
+    card.append(createElement('p', 'mix-hint', 'На этой температуре вариантов нет — показан ближайший.'));
+  }
+  if (mix) {
+    const componentList = createElement('ul', 'mix-components');
+    mix.components.forEach((component) => componentList.append(createComponentRow(component, view, actions)));
+    card.append(componentList);
+    const noteText = mix.note?.[LANG];
+    if (noteText) {
+      card.append(createElement('p', 'mix-note', noteText));
+    }
+  } else {
+    card.append(createElement('p', 'mix-hint', 'Ничего не нашлось. Верните убранный аромат или открепите один.'));
+  }
+  container.replaceChildren(
+    card,
+    ...optional(createExcludedRow(view, actions)),
+    createButton('another-button', actions.onAnother, '↻ Другой микс'),
+  );
+}
+
+export function renderThermometer(container, currentTier, { onSetTemperature }) {
+  const scale = createElement('div', 'thermometer-scale');
+  scale.setAttribute('role', 'group');
+  scale.setAttribute('aria-label', 'Температура мастера');
+  TEMPERATURES.forEach((temperature) => {
+    const button = createButton(`thermometer-step thermometer-step--${temperature.tier}`, () => onSetTemperature(temperature.tier));
+    button.setAttribute('aria-pressed', String(temperature.tier === currentTier));
     button.append(
-      createElement('span', 'direction-icon', direction.icon),
-      createElement('span', 'direction-label', direction.label),
+      createElement('span', 'thermometer-value', temperature.label),
+      createElement('span', 'thermometer-caption', temperature.caption),
     );
-    grid.append(button);
+    scale.append(button);
   });
-  container.replaceChildren(
-    createElement('p', 'screen-hint', 'Чего хочется? Выберите направление — миксы появятся сразу.'),
-    grid,
-  );
-}
-
-export function renderResults(container, view, actions) {
-  container.replaceChildren(
-    createResultsHeader(view, actions),
-    ...optional(createSelectionChips(view, actions)),
-    createShiftRow(view, actions),
-    createMixList(view, actions),
-    createButton('more-button', actions.onMore, 'Ещё варианты'),
-  );
-}
-
-function createResultsHeader({ direction }, { onBack }) {
-  const header = createElement('div', 'results-header');
-  header.append(
-    createButton('back-button', onBack, '← Направления'),
-    createElement('h2', 'results-title', `${direction.icon} ${direction.label}`),
-  );
-  return header;
-}
-
-function createSelectionChips({ state, catalog }, { onUnpin, onInclude }) {
-  const pinned = state.pinned.filter((id) => id !== COOLING_ID);
-  if (pinned.length === 0 && state.excluded.length === 0) {
-    return null;
-  }
-  const row = createElement('div', 'chip-row');
-  pinned.forEach((id) => {
-    row.append(createButton('chip chip--pinned', () => onUnpin(id), `📌 ${label(catalog, id)} ✕`));
-  });
-  state.excluded.forEach((id) => {
-    row.append(createButton('chip chip--excluded', () => onInclude(id), `🚫 ${label(catalog, id)} ✕`));
-  });
-  return row;
-}
-
-function createShiftRow({ state, canPin, isCoolingOn }, { onToggleShift, onToggleCooling }) {
-  const row = createElement('div', 'shift-row');
-  SHIFTS.forEach((shift) => {
-    row.append(createToggle(shift.label, state.shifts.includes(shift.id), () => onToggleShift(shift.id)));
-  });
-  const cooling = createToggle(COOLING_LABEL, isCoolingOn, onToggleCooling);
-  cooling.disabled = !isCoolingOn && !canPin;
-  row.append(cooling);
-  return row;
-}
-
-function createMixList(view, actions) {
-  const list = createElement('section', 'mix-list');
-  list.setAttribute('aria-live', 'polite');
-  if (view.mixes.length === 0) {
-    list.append(createElement('p', 'screen-hint', 'Ничего не нашлось. Снимите одно из уточнений.'));
-    return list;
-  }
-  view.mixes.forEach((mix) => list.append(createMixCard(mix, view, actions)));
-  return list;
-}
-
-function createMixCard(mix, view, actions) {
-  const card = createElement('article', `mix-card mix-card--${mix.tier}`);
-  card.append(createElement('h3', 'mix-tier', TIER_LABELS[mix.tier] ?? mix.tier));
-  const componentList = createElement('ul', 'mix-components');
-  mix.components.forEach((component) => componentList.append(createComponentRow(component, view, actions)));
-  card.append(componentList);
-  const noteText = mix.note?.[LANG];
-  if (noteText) {
-    card.append(createElement('p', 'mix-note', noteText));
-  }
-  const similarButton = createButton('similar-button', () => {}, 'Хочу похожее · скоро');
-  similarButton.disabled = true;
-  card.append(similarButton);
-  return card;
+  container.replaceChildren(createElement('span', 'thermometer-title', '🌡️ Температура мастера'), scale);
 }
 
 function createComponentRow({ flavorId, share }, { state, catalog, canPin }, { onPin, onUnpin, onExclude }) {
-  const isPinned = state.pinned.includes(flavorId);
+  const isPinned = state.required.includes(flavorId);
   const item = createElement('li', 'mix-component');
   const toggle = createButton('mix-component-toggle', () => toggleActions(item));
   toggle.setAttribute('aria-expanded', 'false');
@@ -103,7 +76,7 @@ function createComponentRow({ flavorId, share }, { state, catalog, canPin }, { o
   if (isPinned) {
     actionRow.append(createButton('action-button', () => onUnpin(flavorId), 'Открепить'));
   } else {
-    const pinButton = createButton('action-button', () => onPin(flavorId), '📌 Оставить во всех');
+    const pinButton = createButton('action-button', () => onPin(flavorId), '📌 Оставить');
     pinButton.disabled = !canPin;
     actionRow.append(pinButton);
   }
@@ -112,20 +85,26 @@ function createComponentRow({ flavorId, share }, { state, catalog, canPin }, { o
   return item;
 }
 
+function createExcludedRow({ state, catalog }, { onInclude }) {
+  if (state.excluded.length === 0) {
+    return null;
+  }
+  const row = createElement('div', 'excluded-row');
+  row.append(createElement('span', 'excluded-title', 'Убрано:'));
+  state.excluded.forEach((id) => {
+    row.append(createButton('excluded-chip', () => onInclude(id), `${label(catalog, id)} ✕`));
+  });
+  return row;
+}
+
 function toggleActions(item) {
   const willOpen = item.querySelector('.mix-component-actions').hidden;
-  item.closest('.mix-list').querySelectorAll('.mix-component').forEach((other) => {
+  item.closest('.mix-components').querySelectorAll('.mix-component').forEach((other) => {
     other.querySelector('.mix-component-actions').hidden = true;
     other.querySelector('.mix-component-toggle').setAttribute('aria-expanded', 'false');
   });
   item.querySelector('.mix-component-actions').hidden = !willOpen;
   item.querySelector('.mix-component-toggle').setAttribute('aria-expanded', String(willOpen));
-}
-
-function createToggle(text, isPressed, onClick) {
-  const button = createButton('shift-toggle', onClick, text);
-  button.setAttribute('aria-pressed', String(isPressed));
-  return button;
 }
 
 function createButton(className, onClick, text) {
