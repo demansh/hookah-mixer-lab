@@ -65,13 +65,19 @@ export function renderThermometer(container, currentTier, { onSetTemperature }) 
   scale.setAttribute('role', 'group');
   scale.setAttribute('aria-label', 'Температура мастера');
   TEMPERATURES.forEach((temperature) => {
-    const button = createButton('thermometer-step', () => onSetTemperature(temperature.tier), temperature.label);
+    const selectTemperature = () => onSetTemperature(temperature.tier);
+    const button = createButton(`thermometer-step thermometer-step--${temperature.tier}`, selectTemperature);
     button.setAttribute('aria-pressed', String(temperature.tier === currentTier));
+    button.append(createElement('span', 'thermometer-value', temperature.label));
     scale.append(button);
   });
   const tube = createElement('div', 'thermometer-tube');
   tube.setAttribute('aria-hidden', 'true');
-  tube.append(createElement('div', 'thermometer-empty'), createElement('div', 'thermometer-knob'));
+  tube.append(
+    createElement('div', 'thermometer-empty'),
+    ...TEMPERATURES.map(({ tier }) => createElement('div', `thermometer-tick thermometer-tick--${tier}`)),
+    createElement('div', 'thermometer-knob'),
+  );
   scale.append(tube);
   container.replaceChildren(scale);
 }
