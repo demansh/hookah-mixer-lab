@@ -114,6 +114,59 @@ button:focus-visible {
   color: var(--color-error);
 }
 
+.start-tabs {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.start-tab {
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.start-tab[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+.flavor-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.flavor-group-title {
+  margin: var(--space-2) 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.flavor-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.flavor-chip {
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+}
+
+.flavor-chip:active {
+  background: var(--color-surface-raised);
+  transform: scale(0.96);
+}
+
 .concept-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));

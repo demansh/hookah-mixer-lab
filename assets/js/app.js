@@ -1,7 +1,8 @@
 import { CORE_VERSION, loadCatalog, recommendSelection, createSessionSeed } from '../core/js/index.js';
 import {
   createStartState, readState, writeState, toSelection, isMixScreen, startMix, canPin, pinFlavor, unpinFlavor,
-  removeFromMix, includeFlavor, nextPage, withPage, setTemperature, hasLock, withoutLock,
+  removeFromMix, includeFlavor, nextPage, withPage, setTemperature, hasLock, withoutLock, startFlavorMix, setStartTab,
+  isFlavorSource,
 } from './state.js';
 import { renderStart, renderMix, renderThermometer, renderBottomActions } from './render.js';
 import { TEMPERATURES } from './options.js';
@@ -33,6 +34,8 @@ const seenMixKeys = new Set();
 const actions = {
   onPickConcept: (conceptId) => update(startMix(state, conceptId), { resetSeen: true }),
   onSurprise: () => update(startMix(state, null), { resetSeen: true }),
+  onPickFlavor: (flavorId) => update(startFlavorMix(state, flavorId), { resetSeen: true }),
+  onSetStartTab: (startTab) => update(setStartTab(state, startTab), { replace: true }),
   onPin: (flavorId) => holdMix(pinFlavor(state, flavorId)),
   onUnpin: (flavorId) => holdMix(unpinFlavor(state, flavorId)),
   onExclude: (flavorId) => removeFlavor(flavorId),
@@ -146,7 +149,7 @@ async function render({ preferUnseen = false } = {}) {
     currentMix = null;
     showStatus(null);
     showMaster(masterElement, resolveMood({ temperature: state.temperature }));
-    renderStart(screenElement, { concepts: shuffledConcepts }, actions);
+    renderStart(screenElement, { concepts: shuffledConcepts, catalog, startTab: state.startTab }, actions);
     return;
   }
   if (heldMix) {
@@ -195,6 +198,7 @@ function renderMixCard(mix) {
     mix,
     concept: catalog.concepts.find((concept) => concept.id === state.conceptId) ?? null,
     isFallbackTier: Boolean(mix) && mix.tier !== state.temperature,
+    showTitle: !isFlavorSource(state),
     canPin: canPin(state),
   }, actions);
 }

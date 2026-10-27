@@ -4,16 +4,30 @@ import { TEMPERATURES, DEFAULT_TEMPERATURE } from './options.js';
 const temperatureTiers = new Set(TEMPERATURES.map((temperature) => temperature.tier));
 const LIST_SEPARATOR = ',';
 const MIX_SCREEN = 'mix';
+const START_TABS = ['mood', 'taste'];
+const DEFAULT_START_TAB = 'mood';
+const FLAVOR_SOURCE = 'flavor';
 
-export function createStartState(temperature = DEFAULT_TEMPERATURE) {
-  return { screen: 'start', conceptId: null, required: [], excluded: [], locked: [], page: 0, temperature };
+export function createStartState(temperature = DEFAULT_TEMPERATURE, startTab = DEFAULT_START_TAB) {
+  return {
+    screen: 'start',
+    startTab,
+    source: null,
+    conceptId: null,
+    required: [],
+    excluded: [],
+    locked: [],
+    page: 0,
+    temperature,
+  };
 }
 
 export function readState(search, catalog) {
   const params = new URLSearchParams(search);
   const temperature = temperatureTiers.has(params.get('t')) ? params.get('t') : DEFAULT_TEMPERATURE;
   if (params.get('s') !== MIX_SCREEN) {
-    return createStartState(temperature);
+    const startTab = START_TABS.includes(params.get('tab')) ? params.get('tab') : DEFAULT_START_TAB;
+    return createStartState(temperature, startTab);
   }
   const conceptId = catalog.concepts.some((concept) => concept.id === params.get('c')) ? params.get('c') : null;
   const isKnownIngredient = (id) => isIngredient(catalog.flavorsById.get(id) ?? {});
@@ -23,6 +37,8 @@ export function readState(search, catalog) {
   const page = Math.max(0, Number.parseInt(params.get('p') ?? '0', 10) || 0);
   return {
     screen: MIX_SCREEN,
+    startTab: DEFAULT_START_TAB,
+    source: params.get('from') === FLAVOR_SOURCE && !conceptId ? FLAVOR_SOURCE : null,
     conceptId,
     required,
     excluded,
@@ -39,12 +55,17 @@ export function writeState(state) {
     if (state.conceptId) {
       params.set('c', state.conceptId);
     }
+    if (state.source === FLAVOR_SOURCE) {
+      params.set('from', FLAVOR_SOURCE);
+    }
     writeList(params, 'keep', state.required);
     writeList(params, 'drop', state.excluded);
     writeList(params, 'lock', state.locked);
     if (state.page > 0) {
       params.set('p', String(state.page));
     }
+  } else if (state.startTab !== DEFAULT_START_TAB) {
+    params.set('tab', state.startTab);
   }
   if (state.temperature !== DEFAULT_TEMPERATURE) {
     params.set('t', state.temperature);
@@ -86,7 +107,28 @@ export function isMixScreen(state) {
 }
 
 export function startMix(state, conceptId) {
-  return { ...state, screen: MIX_SCREEN, conceptId, required: [], excluded: [], locked: [], page: 0 };
+  return { ...state, screen: MIX_SCREEN, source: null, conceptId, required: [], excluded: [], locked: [], page: 0 };
+}
+
+export function startFlavorMix(state, flavorId) {
+  return {
+    ...state,
+    screen: MIX_SCREEN,
+    source: FLAVOR_SOURCE,
+    conceptId: null,
+    required: [flavorId],
+    excluded: [],
+    locked: [],
+    page: 0,
+  };
+}
+
+export function setStartTab(state, startTab) {
+  return state.startTab === startTab ? state : { ...state, startTab };
+}
+
+export function isFlavorSource(state) {
+  return state.source === FLAVOR_SOURCE;
 }
 
 export function canPin(state) {

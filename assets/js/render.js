@@ -1,5 +1,5 @@
-import { flavorLabel } from '../core/js/index.js';
-import { TEMPERATURES } from './options.js';
+import { flavorLabel, isIngredient } from '../core/js/index.js';
+import { TEMPERATURES, START_TABS, FLAVOR_CATEGORIES, HIDDEN_TASTE_FLAVORS } from './options.js';
 import { t, getLang } from './i18n.js';
 import { createIcon } from './icons.js';
 import { CONCEPT_EMOJI } from './concept-emoji.js';
@@ -9,13 +9,48 @@ export function conceptLabel(concept) {
   return phrase.charAt(0).toUpperCase() + phrase.slice(1);
 }
 
-export function renderStart(container, { concepts }, { onPickConcept }) {
+export function renderStart(container, { concepts, catalog, startTab }, actions) {
+  const tabs = createElement('div', 'start-tabs');
+  tabs.setAttribute('role', 'group');
+  START_TABS.forEach((tab) => {
+    const button = createButton('start-tab', () => actions.onSetStartTab(tab.id), t(tab.labelKey));
+    button.setAttribute('aria-pressed', String(tab.id === startTab));
+    tabs.append(button);
+  });
+  const content = startTab === 'taste'
+    ? [createElement('p', 'screen-hint', t('tasteHint')), ...createFlavorGroups(catalog, actions)]
+    : [createElement('p', 'screen-hint', t('startHint')), createConceptGrid(concepts, actions)];
+  container.replaceChildren(tabs, ...content);
+}
+
+function createConceptGrid(concepts, { onPickConcept }) {
   const grid = createElement('div', 'concept-grid');
   concepts.forEach((concept) => grid.append(createConceptButton(concept, () => onPickConcept(concept.id))));
-  container.replaceChildren(
-    createElement('p', 'screen-hint', t('startHint')),
-    grid,
-  );
+  return grid;
+}
+
+function createFlavorGroups(catalog, { onPickFlavor }) {
+  const knownCategories = new Set(FLAVOR_CATEGORIES.map((category) => category.id));
+  const tasteFlavors = catalog.flavors.filter((flavor) => isIngredient(flavor) && !HIDDEN_TASTE_FLAVORS.has(flavor.id));
+  const groups = [
+    ...FLAVOR_CATEGORIES.map((category) => ({
+      title: `${category.emoji} ${t(category.labelKey)}`,
+      flavors: tasteFlavors.filter((flavor) => flavor.category === category.id),
+    })),
+    { title: t('categoryOther'), flavors: tasteFlavors.filter((flavor) => !knownCategories.has(flavor.category)) },
+  ];
+  return groups
+    .filter((group) => group.flavors.length > 0)
+    .map((group) => {
+      const section = createElement('section', 'flavor-group');
+      const chips = createElement('div', 'flavor-chips');
+      group.flavors
+        .map((flavor) => ({ id: flavor.id, name: flavorLabel(flavor, getLang()) }))
+        .sort((left, right) => left.name.localeCompare(right.name, getLang()))
+        .forEach(({ id, name }) => chips.append(createButton('flavor-chip', () => onPickFlavor(id), name)));
+      section.append(createElement('h2', 'flavor-group-title', group.title), chips);
+      return section;
+    });
 }
 
 function createConceptButton(concept, onClick) {
@@ -30,9 +65,11 @@ function createConceptButton(concept, onClick) {
 }
 
 export function renderMix(container, view, actions) {
-  const { concept, mix, isFallbackTier } = view;
+  const { concept, mix, isFallbackTier, showTitle } = view;
   const card = createElement('article', `mix-card mix-card--${mix?.tier ?? 'none'}`);
-  card.append(createElement('h2', 'mix-concept', concept ? conceptLabel(concept) : t('mastersChoice')));
+  if (showTitle) {
+    card.append(createElement('h2', 'mix-concept', concept ? conceptLabel(concept) : t('mastersChoice')));
+  }
   if (isFallbackTier) {
     card.append(createElement('p', 'mix-hint', t('fallbackTier')));
   }
