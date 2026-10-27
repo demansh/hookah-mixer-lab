@@ -54,18 +54,18 @@ export function renderBottomActions(container, isMixScreen, { onSurprise, onRese
 }
 
 export function renderThermometer(container, currentTier, { onSetTemperature }) {
-  const scale = createElement('div', 'thermometer-scale');
+  const scale = createElement('div', `thermometer-scale thermometer-scale--${currentTier}`);
   scale.setAttribute('role', 'group');
   scale.setAttribute('aria-label', 'Температура мастера');
   TEMPERATURES.forEach((temperature) => {
-    const button = createButton(`thermometer-step thermometer-step--${temperature.tier}`, () => onSetTemperature(temperature.tier));
+    const button = createButton('thermometer-step', () => onSetTemperature(temperature.tier), temperature.label);
     button.setAttribute('aria-pressed', String(temperature.tier === currentTier));
-    button.append(
-      createElement('span', 'thermometer-value', temperature.label),
-      createElement('span', 'thermometer-caption', temperature.caption),
-    );
     scale.append(button);
   });
+  const tube = createElement('div', 'thermometer-tube');
+  tube.setAttribute('aria-hidden', 'true');
+  tube.append(createElement('div', 'thermometer-empty'), createElement('div', 'thermometer-knob'));
+  scale.append(tube);
   container.replaceChildren(createElement('span', 'thermometer-title', '🌡️ Температура мастера'), scale);
 }
 

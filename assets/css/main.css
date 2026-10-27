@@ -18,7 +18,7 @@
   --space-3: 12px;
   --space-4: 16px;
   --control-height: 44px;
-  --bottom-bar-height: 168px;
+  --bottom-bar-height: 150px;
   --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-emoji: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
   color-scheme: dark;
@@ -315,38 +315,74 @@ button:focus-visible {
 }
 
 .thermometer-scale {
+  --thermometer-level: 16.667%;
+  position: relative;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  border-radius: var(--radius-pill);
-  background: linear-gradient(90deg, var(--color-tier-classic), var(--color-tier-balanced), var(--color-tier-bold));
-  padding: 3px;
-  gap: 3px;
+  padding-bottom: 14px;
+}
+
+.thermometer-scale--balanced {
+  --thermometer-level: 50%;
+}
+
+.thermometer-scale--bold {
+  --thermometer-level: 83.333%;
 }
 
 .thermometer-step {
-  min-height: 52px;
+  min-height: 58px;
+  margin-bottom: -14px;
+  padding: 0 0 calc(14px + var(--space-1));
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
   border: 0;
-  border-radius: var(--radius-pill);
-  background: var(--color-bg);
+  background: transparent;
   color: var(--color-text-muted);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  position: relative;
+  z-index: 1;
 }
 
 .thermometer-step[aria-pressed="true"] {
-  background: transparent;
-  color: var(--color-accent-text);
+  color: var(--color-text);
+  font-size: 1.1rem;
 }
 
-.thermometer-value {
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+.thermometer-tube {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 3px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--color-tier-classic), var(--color-tier-balanced), var(--color-tier-bold));
 }
 
-.thermometer-caption {
-  font-size: 0.75rem;
+.thermometer-empty {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: var(--thermometer-level);
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+  background: var(--color-surface-raised);
+  transition: left 0.2s ease;
+}
+
+.thermometer-knob {
+  position: absolute;
+  top: 50%;
+  left: var(--thermometer-level);
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-bg);
+  border-radius: 50%;
+  background: var(--color-text);
+  transform: translate(-50%, -50%);
+  transition: left 0.2s ease;
 }
 
 .app-footer {
