@@ -1,6 +1,7 @@
 import { flavorLabel } from '../core/js/index.js';
 import { TEMPERATURES, LANG } from './options.js';
 import { createIcon } from './icons.js';
+import { CONCEPT_EMOJI } from './concept-emoji.js';
 
 export function conceptLabel(concept) {
   const phrase = concept.phrases[LANG][0] ?? concept.id;
@@ -8,14 +9,23 @@ export function conceptLabel(concept) {
 }
 
 export function renderStart(container, { concepts }, { onPickConcept }) {
-  const cloud = createElement('div', 'concept-cloud');
-  concepts.forEach((concept) => {
-    cloud.append(createButton('concept-chip', () => onPickConcept(concept.id), conceptLabel(concept)));
-  });
+  const grid = createElement('div', 'concept-grid');
+  concepts.forEach((concept) => grid.append(createConceptButton(concept, () => onPickConcept(concept.id))));
   container.replaceChildren(
     createElement('p', 'screen-hint', 'Выберите настроение — или доверьтесь случаю кнопкой внизу.'),
-    cloud,
+    grid,
   );
+}
+
+function createConceptButton(concept, onClick) {
+  const emoji = CONCEPT_EMOJI[concept.id];
+  if (!emoji) {
+    return createButton('concept-chip', onClick, conceptLabel(concept));
+  }
+  const button = createButton('concept-emoji', onClick, emoji);
+  button.setAttribute('aria-label', conceptLabel(concept));
+  button.title = conceptLabel(concept);
+  return button;
 }
 
 export function renderMix(container, view, actions) {
