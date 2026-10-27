@@ -1,19 +1,19 @@
 import { flavorLabel } from '../core/js/index.js';
 import { TEMPERATURES, LANG } from './options.js';
+import { createIcon } from './icons.js';
 
 export function conceptLabel(concept) {
   const phrase = concept.phrases[LANG][0] ?? concept.id;
   return phrase.charAt(0).toUpperCase() + phrase.slice(1);
 }
 
-export function renderStart(container, { concepts }, { onPickConcept, onSurprise }) {
+export function renderStart(container, { concepts }, { onPickConcept }) {
   const cloud = createElement('div', 'concept-cloud');
   concepts.forEach((concept) => {
     cloud.append(createButton('concept-chip', () => onPickConcept(concept.id), conceptLabel(concept)));
   });
   container.replaceChildren(
-    createButton('surprise-button', onSurprise, '🎲 Мастер, на твой вкус'),
-    createElement('p', 'screen-hint', 'или выберите настроение:'),
+    createElement('p', 'screen-hint', 'Выберите настроение — или доверьтесь случаю кнопкой внизу.'),
     cloud,
   );
 }
@@ -39,10 +39,17 @@ export function renderMix(container, view, actions) {
   } else {
     card.append(createElement('p', 'mix-hint', 'Ничего не нашлось. Верните убранный аромат или открепите один.'));
   }
+  container.replaceChildren(card, ...optional(createExcludedRow(view, actions)));
+}
+
+export function renderBottomActions(container, isMixScreen, { onSurprise, onReset, onAnother }) {
+  if (!isMixScreen) {
+    container.replaceChildren(createButton('surprise-button', onSurprise, '🎲 Случайный микс'));
+    return;
+  }
   container.replaceChildren(
-    card,
-    ...optional(createExcludedRow(view, actions)),
-    createButton('another-button', actions.onAnother, '↻ Другой микс'),
+    createIconButton('reset-button', onReset, 'trash', 'Начать заново'),
+    createIconButton('another-button', onAnother, 'refresh', 'Другой микс'),
   );
 }
 
@@ -105,6 +112,14 @@ function toggleActions(item) {
   });
   item.querySelector('.mix-component-actions').hidden = !willOpen;
   item.querySelector('.mix-component-toggle').setAttribute('aria-expanded', String(willOpen));
+}
+
+function createIconButton(className, onClick, iconName, accessibleLabel) {
+  const button = createButton(`icon-button ${className}`, onClick);
+  button.setAttribute('aria-label', accessibleLabel);
+  button.title = accessibleLabel;
+  button.append(createIcon(iconName));
+  return button;
 }
 
 function createButton(className, onClick, text) {

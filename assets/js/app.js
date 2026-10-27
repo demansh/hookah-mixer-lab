@@ -3,19 +3,20 @@ import {
   createStartState, readState, writeState, toSelection, isMixScreen, startMix, canPin, pinFlavor, unpinFlavor,
   excludeFlavor, includeFlavor, nextPage, withPage, setTemperature,
 } from './state.js';
-import { renderStart, renderMix, renderThermometer } from './render.js';
+import { renderStart, renderMix, renderThermometer, renderBottomActions } from './render.js';
 import { TEMPERATURES } from './options.js';
 
 const baseUrl = document.documentElement.dataset.baseurl || '';
-const sessionSeed = createSessionSeed();
 const tierOrder = TEMPERATURES.map((temperature) => temperature.tier);
 
 const screenElement = document.getElementById('screen');
 const thermometerElement = document.getElementById('thermometer');
+const bottomActionsElement = document.getElementById('bottom-actions');
 const statusElement = document.getElementById('status');
 const footerElement = document.getElementById('app-footer');
 
 let catalog = null;
+let sessionSeed = createSessionSeed();
 let shuffledConcepts = [];
 let state = createStartState();
 let renderRevision = 0;
@@ -28,11 +29,12 @@ const actions = {
   onExclude: (flavorId) => update(excludeFlavor(state, flavorId)),
   onInclude: (flavorId) => update(includeFlavor(state, flavorId)),
   onAnother: () => update(nextPage(state)),
+  onReset: () => resetProgress(),
   onSetTemperature: (tier) => update(setTemperature(state, tier), { replace: true, keepScroll: true }),
 };
 
 async function main() {
-  footerElement.textContent = `core ${CORE_VERSION} · seed ${sessionSeed}`;
+  renderFooter();
   try {
     catalog = await loadCatalog(`${baseUrl}/assets/core/data`);
   } catch (error) {
@@ -47,6 +49,17 @@ async function main() {
     render();
   });
   render();
+}
+
+function resetProgress() {
+  sessionSeed = createSessionSeed();
+  shuffledConcepts = shuffle(catalog.concepts);
+  renderFooter();
+  update(createStartState(state.temperature));
+}
+
+function renderFooter() {
+  footerElement.textContent = `core ${CORE_VERSION} · seed ${sessionSeed}`;
 }
 
 function update(nextState, { replace = false, keepScroll = false } = {}) {
@@ -73,6 +86,7 @@ function saveUrl(replace) {
 async function render() {
   const revision = ++renderRevision;
   renderThermometer(thermometerElement, state.temperature, actions);
+  renderBottomActions(bottomActionsElement, isMixScreen(state), actions);
   if (!isMixScreen(state)) {
     showStatus(null);
     renderStart(screenElement, { concepts: shuffledConcepts }, actions);
