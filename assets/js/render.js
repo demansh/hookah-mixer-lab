@@ -71,24 +71,22 @@ export function renderThermometer(container, currentTier, { onSetTemperature }) 
 
 function createComponentRow({ flavorId, share }, { state, catalog, canPin }, { onPin, onUnpin, onExclude }) {
   const isPinned = state.required.includes(flavorId);
-  const item = createElement('li', 'mix-component');
-  const toggle = createButton('mix-component-toggle', () => toggleActions(item));
-  toggle.setAttribute('aria-expanded', 'false');
-  toggle.append(
-    createElement('span', 'mix-component-name', `${isPinned ? '📌 ' : ''}${label(catalog, flavorId)}`),
-    createElement('span', 'mix-component-share', `${share}%`),
+  const flavorName = label(catalog, flavorId);
+  const item = createElement('li', `mix-component${isPinned ? ' mix-component--pinned' : ''}`);
+  const pinButton = createIconButton(
+    'pin-button',
+    () => (isPinned ? onUnpin(flavorId) : onPin(flavorId)),
+    'heart',
+    isPinned ? `Открепить: ${flavorName}` : `Оставить во всех миксах: ${flavorName}`,
   );
-  const actionRow = createElement('div', 'mix-component-actions');
-  actionRow.hidden = true;
-  if (isPinned) {
-    actionRow.append(createButton('action-button', () => onUnpin(flavorId), 'Открепить'));
-  } else {
-    const pinButton = createButton('action-button', () => onPin(flavorId), '📌 Оставить');
-    pinButton.disabled = !canPin;
-    actionRow.append(pinButton);
-  }
-  actionRow.append(createButton('action-button action-button--danger', () => onExclude(flavorId), '✕ Убрать'));
-  item.append(toggle, actionRow);
+  pinButton.setAttribute('aria-pressed', String(isPinned));
+  pinButton.disabled = !isPinned && !canPin;
+  item.append(
+    pinButton,
+    createElement('span', 'mix-component-name', flavorName),
+    createElement('span', 'mix-component-share', `${share}%`),
+    createIconButton('exclude-button', () => onExclude(flavorId), 'x', `Убрать: ${flavorName}`),
+  );
   return item;
 }
 
@@ -102,16 +100,6 @@ function createExcludedRow({ state, catalog }, { onInclude }) {
     row.append(createButton('excluded-chip', () => onInclude(id), `${label(catalog, id)} ✕`));
   });
   return row;
-}
-
-function toggleActions(item) {
-  const willOpen = item.querySelector('.mix-component-actions').hidden;
-  item.closest('.mix-components').querySelectorAll('.mix-component').forEach((other) => {
-    other.querySelector('.mix-component-actions').hidden = true;
-    other.querySelector('.mix-component-toggle').setAttribute('aria-expanded', 'false');
-  });
-  item.querySelector('.mix-component-actions').hidden = !willOpen;
-  item.querySelector('.mix-component-toggle').setAttribute('aria-expanded', String(willOpen));
 }
 
 function createIconButton(className, onClick, iconName, accessibleLabel) {
